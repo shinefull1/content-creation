@@ -30,6 +30,28 @@ The interface includes multiple tools:
    - generate images with Stable Diffusion XL
    - optionally animate them into short video clips with Stable Video Diffusion
 
+## Code architecture and function overview
+
+The project is organized around a few key functions in [app_interfaz.py](app_interfaz.py):
+
+- `load_local_env()`: loads private environment variables from a local `.env` file.
+- `setup_cuda_paths()`: makes sure CUDA binaries are visible to the app on local Windows installs.
+- `load_audio_models()`: initializes Whisper and OmniVoice so the app can transcribe and generate speech.
+- `release_full_vram()`: clears memory before starting the visual generation phase.
+- `apply_preset()`: loads a visual style preset into the cinematic prompt pipeline.
+- `format_time()`: converts timestamps to SRT format.
+- `get_next_reddit_name()` and `get_next_ai_name()`: choose the next sequential output name.
+- `process_story_memory()`: cleans Reddit-style story input into a more consistent speech script.
+- `run_reddit_pipeline()`: turns a story into spoken WAV audio and an SRT file.
+- `run_cinematic_pipeline()`: creates scene prompts, still images, and optional AI video clips.
+- `download_youtube_video()`: downloads a background video using optional cookies.
+
+The Gradio interface is split into three tabs:
+
+1. Reddit Stories Studio: story-to-audio and subtitle generation.
+2. Background Scraper: YouTube background downloads.
+3. Cinematic AI Studio: prompt-driven image and video generation.
+
 ## Required setup
 
 This project expects a local Python environment and a capable GPU. On Windows, the typical flow is:

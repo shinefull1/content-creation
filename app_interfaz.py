@@ -1,3 +1,15 @@
+"""Local AI content generation suite for scripts, voice, subtitles, and image/video pipelines.
+
+This application exposes a Gradio interface for three primary workflows:
+
+1. Reddit story generation: transforms written stories into audio and subtitle files.
+2. YouTube background downloading: saves background video assets to the selected project folder.
+3. Cinematic AI Studio: creates scene prompts, still images, and optional AI video clips from a script.
+
+The module keeps machine-specific configuration such as local paths and cookies outside of Git by
+loading environment variables from a private local .env file when available.
+"""
+
 import gradio as gr
 import os
 import re
@@ -43,7 +55,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def load_local_env():
-    """Load machine-specific local settings from a local .env file if present."""
+    """Load machine-specific settings from a local .env file without exposing secrets in Git.
+
+    This function reads key/value pairs from a private .env file in the project root and stores
+    them in os.environ only when they are not already defined. It is used to keep local paths,
+    model locations, and browser cookie paths machine-specific while the repository remains public.
+    """
     env_path = os.path.join(BASE_DIR, ".env")
     if not os.path.exists(env_path):
         return
@@ -85,7 +102,11 @@ for folder in [REDDIT_AUDIO_DIR, REDDIT_SUBTITLE_DIR, REDDIT_VIDEO_DIR,
 
 
 def setup_cuda_paths():
-    """Add CUDA runtime directories from installed packages to the PATH."""
+    """Add NVIDIA CUDA runtime directories to the process PATH when they are installed.
+
+    Some local GPU stacks place CUDA toolkit binaries under package directories rather than the
+    system-wide PATH. This helper ensures those DLLs are discoverable before the app loads models.
+    """
     for path in sys.path:
         if 'site-packages' in path:
             cublas_path = os.path.join(path, "nvidia", "cublas", "bin")
@@ -106,7 +127,11 @@ omnivoice_model = None
 
 
 def load_audio_models():
-    """Instantiate the speech recognition and TTS models once and reuse them."""
+    """Instantiate the audio models once and reuse them for all generation tasks.
+
+    The app keeps long-lived Whisper and OmniVoice model instances in memory to avoid repeatedly
+    reloading them for each request. This improves speed during subtitle extraction and TTS work.
+    """
     global whisper_model, omnivoice_model
     if whisper_model is None:
         print("[*] Loading Faster-Whisper into VRAM...")
@@ -117,7 +142,11 @@ def load_audio_models():
 
 
 def release_full_vram():
-    """Clear cached models and free VRAM before the visual pipeline begins."""
+    """Release audio-model memory before the image/video generation stage begins.
+
+    The visual pipeline can be memory intensive, so the app unloads the heavier audio models and
+    clears CUDA cache to make room for Stable Diffusion and video generation models.
+    """
     global whisper_model, omnivoice_model
     print("[⚡] Unloading audio models and clearing VRAM for the visual pipeline...")
     whisper_model = None
@@ -175,12 +204,18 @@ STYLE_PRESETS = {
 }
 
 def apply_preset(preset_name):
+    """Return the system and negative prompts associated with a visual style preset.
+
+    This helper powers the preset dropdown in the UI. It allows quick switching between art
+    directions without manually rewriting the prompt text for each scene generation batch.
+    """
     if preset_name in STYLE_PRESETS:
         return STYLE_PRESETS[preset_name]["system"], STYLE_PRESETS[preset_name]["negative"]
     return "", ""
 
 
 def format_time(seconds):
+    """Convert a floating-point timestamp to the SRT-compatible format HH:MM:SS,mmm."""
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
@@ -189,19 +224,26 @@ def format_time(seconds):
 
 
 def get_next_reddit_name():
+    """Find the next sequential file name for Reddit-generated audio files."""
     files = os.listdir(REDDIT_AUDIO_DIR)
     numbers = [int(match.group(1)) for match in (re.match(r'vid(\d+)\.wav', file_name, re.IGNORECASE) for file_name in files) if match]
     return f"vid{max(numbers) + 1}" if numbers else "vid1"
 
 
 def get_next_ai_name():
+    """Find the next sequential file name for image/video project outputs in the AI studio."""
     files = os.listdir(AI_AUDIO_DIR)
     numbers = [int(match.group(1)) for match in (re.match(r'vid(\d+)\.wav', file_name, re.IGNORECASE) for file_name in files) if match]
     return f"vid{max(numbers) + 1}" if numbers else "vid1"
 
 
 def process_story_memory(raw_text):
-    """Normalize multi-part Reddit story blocks into a cleaner narrative format."""
+    """Normalize multi-part Reddit story blocks into a cleaner narrative format.
+
+    Reddit stories often contain titles, part separators, and bracketed metadata. This function
+    strips those fragments and reformats the narrative into a more consistent speech-generation
+    input that works better with the TTS pipeline.
+    """
     story_parts = re.split(r'(?i)Part\s+1', raw_text, maxsplit=1)
     if len(story_parts) < 2:
         return raw_text
@@ -218,7 +260,11 @@ def process_story_memory(raw_text):
     return final_text
 
 def run_reddit_pipeline(story_text, custom_name):
-    """Generate Reddit-style voice audio and subtitle files from story text."""
+    """Generate voice audio and subtitle files for a Reddit-style story.
+
+    The pipeline normalizes the provided text, turns it into a sequence of TTS chunks, saves the
+    final WAV output, and then uses Whisper to create an SRT subtitle file word-by-word.
+    """
     global whisper_model, omnivoice_model
     if not story_text.strip():
         yield "❌ Error: The story text is empty."
@@ -281,7 +327,12 @@ def run_reddit_pipeline(story_text, custom_name):
     yield log
 
 def run_cinematic_pipeline(script_text, custom_name, generation_mode, scene_count, system_prompt_custom, negative_prompt_custom):
-    """Render cinematic AI content by creating scene prompts, images, and optional video output."""
+    """Create a cinematic AI content package from a script.
+
+    The workflow includes generating voice audio, extracting subtitles, asking a local LLM to split
+    the story into scene prompts, generating still images with SDXL, and optionally creating motion
+    clips with video diffusion. The function emits live log updates so the UI can show progress.
+    """
     global whisper_model, omnivoice_model
     if not script_text.strip():
         yield "❌ Error: The script is empty."
@@ -439,7 +490,11 @@ def run_cinematic_pipeline(script_text, custom_name, generation_mode, scene_coun
     yield log
 
 def download_youtube_video(video_url, destination_folder):
-    """Download a YouTube video using optional cookies if available."""
+    """Download a YouTube video into the selected project folder.
+
+    If a cookie file exists, it is passed to yt-dlp to improve compatibility with protected or
+    region-sensitive download sources. The function returns a simple status message to the UI.
+    """
     if not video_url.strip():
         return "❌ Error: Please enter a valid YouTube link."
 
@@ -470,9 +525,16 @@ def download_youtube_video(video_url, destination_folder):
 
 
 with gr.Blocks() as interface:
+    """Main Gradio application container for the local content pipeline.
+
+    The interface is organized into three tabs: Reddit story synthesis, YouTube background
+    downloading, and cinematic AI generation. Each tab routes user input to a dedicated function
+    responsible for processing the selected content workflow.
+    """
     gr.Markdown("# ⚡ Multi-Channel Content Automation Suite (RTX 3060)")
 
     with gr.Tab("🎙️ Reddit Stories Studio"):
+        """Tab for turning a story into text-to-speech audio and subtitle files."""
         with gr.Row():
             with gr.Column(scale=2):
                 story_input = gr.Textbox(lines=14, placeholder="Paste your Reddit story here...", label="Original Story")
@@ -485,6 +547,7 @@ with gr.Blocks() as interface:
         generate_button.click(fn=run_reddit_pipeline, inputs=[story_input, custom_name_input], outputs=reddit_log_output)
 
     with gr.Tab("📥 Background Scraper"):
+        """Tab for downloading external video assets used as background footage."""
         gr.Markdown("### Download background videos in maximum quality manually.")
         with gr.Row():
             with gr.Column(scale=2):
@@ -497,6 +560,7 @@ with gr.Blocks() as interface:
         download_button.click(fn=download_youtube_video, inputs=[youtube_url_input, destination_folder_input], outputs=youtube_result_output)
 
     with gr.Tab("🎨 Cinematic AI Studio"):
+        """Tab for script-to-image and script-to-video cinematic content generation."""
         gr.Markdown("### Exclusive Local AI Cinematic Production")
         with gr.Row():
             with gr.Column(scale=2):
