@@ -1,0 +1,35 @@
+# Python virtual envs
+venv/
+venv_omni/
+.venv/
+
+# Local generated output
+generated/
+models/
+*.wav
+*.mp3
+*.mp4
+*.png
+*.srt
+
+# Browser cookies and personal data
+cookies.txt
+cookies.txt.txt
+*.cookies
+**/cookies*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+__pycache__/
+*.pyc
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Large local model caches
+hf_cache/
+.cache/
