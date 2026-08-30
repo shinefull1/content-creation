@@ -37,7 +37,7 @@ from faster_whisper import WhisperModel
 from omnivoice import OmniVoice
 
 # ==========================================
-# 🌍 CONFIGURACIÓN DE ENTORNO PARA HUGGING FACE
+# 🌍 ENVIRONMENT CONFIGURATION FOR HUGGING FACE
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -63,12 +63,12 @@ os.environ.setdefault("HF_HOME", os.path.join(BASE_DIR, "models", "huggingface")
 os.environ.setdefault("HF_HUB_CACHE", os.path.join(BASE_DIR, "models", "huggingface"))
 
 # ==========================================
-# ⚙️ CONFIGURACIÓN DE RUTAS UNIFICADAS
+# ⚙️ UNIFIED FOLDER CONFIGURATION
 # ==========================================
 RUTA_RAIZ = os.environ.get("CONTENT_ROOT", os.path.join(BASE_DIR, "generated"))
 
 CARPETA_AUDIOS_REDDIT = os.path.join(RUTA_RAIZ, "reddit stories", "audios mp3")
-CARPETA_SUBS_REDDIT = os.path.join(RUTA_RAIZ, "reddit stories", "subtitulos")
+CARPETA_SUBS_REDDIT = os.path.join(RUTA_RAIZ, "reddit stories", "subtitles")
 CARPETA_VIDEOS_REDDIT = os.path.join(RUTA_RAIZ, "reddit stories", "videos de fondo")
 
 CARPETA_AUDIOS_AI = os.path.join(RUTA_RAIZ, "tts a imagen", "audios")
@@ -206,7 +206,7 @@ def procesar_historia_memoria(texto_bruto):
 def ejecutar_pipeline_reddit(texto_historia, nombre_custom):
     global modelo_whisper, modelo_omnivoice
     if not texto_historia.strip():
-        yield "❌ Error: El texto de la historia está vacío."
+        yield "❌ Error: The story text is empty."
         return
 
     cargar_modelos_audio()
@@ -215,7 +215,7 @@ def ejecutar_pipeline_reddit(texto_historia, nombre_custom):
     ruta_srt_final = os.path.join(CARPETA_SUBS_REDDIT, f"{nombre_proyecto}.srt")
     texto_referencia = "She wanted new iphone 15 so my husband and i made a deal."
 
-    log = f"🚀 Iniciando generación Reddit: {nombre_proyecto}\n\n"
+    log = f"🚀 Starting Reddit generation: {nombre_proyecto}\n\n"
     yield log
 
     texto_procesado = procesar_historia_memoria(texto_historia)
@@ -239,10 +239,10 @@ def ejecutar_pipeline_reddit(texto_historia, nombre_custom):
         audio_tensor = torch.from_numpy(audio_final_np).unsqueeze(0)
         torchaudio.save(ruta_audio_final, audio_tensor, 24000)
     except Exception as e:
-        yield log + f"\n[ERROR TTS]: {e}"
+        yield log + f"\n[TTS ERROR]: {e}"
         return
 
-    log += "[✔] Audio creado. Mapeando subtítulos SRT...\n"
+    log += "[✔] Audio created. Mapping SRT subtitles...\n"
     yield log
     try:
         segments, _ = modelo_whisper.transcribe(ruta_audio_final, language="en", word_timestamps=True)
@@ -259,30 +259,30 @@ def ejecutar_pipeline_reddit(texto_historia, nombre_custom):
         with open(ruta_srt_final, "w", encoding="utf-8") as f:
             f.write(srt_content)
     except Exception as e:
-        yield log + f"\n[ERROR SRT]: {e}"
+        yield log + f"\n[SRT ERROR]: {e}"
         return
 
-    log += f"\n✅ ¡PROCESO REDDIT COMPLETADO!\n🔊 Audio: {ruta_audio_final}\n📝 Subs: {ruta_srt_final}"
+    log += f"\n✅ Reddit process completed!\n🔊 Audio: {ruta_audio_final}\n📝 Subs: {ruta_srt_final}"
     yield log
 
 def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, cantidad_escenas, system_prompt_custom, negative_prompt_custom):
     global modelo_whisper, modelo_omnivoice
     if not texto_guion.strip():
-        yield "❌ Error: El guion está vacío."
+        yield "❌ Error: The script is empty."
         return
 
     nombre_proyecto = nombre_custom.strip() if nombre_custom.strip() else obtener_siguiente_nombre_ai()
     ruta_audio = os.path.join(CARPETA_AUDIOS_AI, f"{nombre_proyecto}.wav")
     ruta_subs = os.path.join(CARPETA_SUBS_AI, f"{nombre_proyecto}.srt")
     
-    log = f"🎬 Iniciando Producción Cinematográfica: {nombre_proyecto}\n"
+    log = f"🎬 Starting cinematic production: {nombre_proyecto}\n"
     yield log
 
     if os.path.exists(ruta_audio) and os.path.exists(ruta_subs):
-        log += "ℹ️ Audio y Subtítulos existentes detectados. Saltando generación de voz.\n"
+        log += "ℹ️ Existing audio and subtitles detected. Skipping voice generation.\n"
         yield log
     else:
-        log += "🎙️ Audio/Subs faltantes. Inicializando modelos de audio...\n"
+        log += "🎙️ Audio/subtitles missing. Initializing audio models...\n"
         yield log
         cargar_modelos_audio()
         
@@ -300,15 +300,15 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
                     index += 1
             with open(ruta_subs, "w", encoding="utf-8") as f:
                 f.write(srt_content)
-            log += "✅ Audio y subtítulos generados con éxito.\n"
+            log += "✅ Audio and subtitles generated successfully.\n"
             yield log
         except Exception as e:
-            yield log + f"\n[ERROR EN AUDIO AI]: {e}"
+            yield log + f"\n[AUDIO AI ERROR]: {e}"
             return
 
     liberar_vram_completa()
 
-    log += "🧠 Estructurando escenas narrativas...\n"
+    log += "🧠 Structuring narrative scenes...\n"
     yield log
     
     try:
@@ -333,16 +333,15 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
         if match:
             prompts_visuales = json.loads(match.group(0))
         else:
-            raise ValueError("El LLM no devolvió un formato JSON válido.")
+            raise ValueError("The local LLM did not return valid JSON.")
             
-        log += f"📋 Se han estructurado {len(prompts_visuales)} escenas con LLM.\n"
+        log += f"📋 {len(prompts_visuales)} scenes were structured by the local LLM.\n"
         yield log
     except Exception as e:
-        log += f"⚠️ Fallo en LLM Local ({e}). Usando segmentación nativa por oraciones.\n"
+        log += f"⚠️ Local LLM failed ({e}). Using native sentence segmentation instead.\n"
         yield log
         oraciones = [o.strip() for o in re.split(r'[.!?]', texto_guion) if len(o.strip()) > 10]
         
-        # --- NUEVO FILTRO PARA SALVAR TOKENS ---
         match = re.search(r'(STYLE:.*?)(?:OUTPUT:|$)', system_prompt_custom, re.IGNORECASE | re.DOTALL)
         estilo_limpio = match.group(1).strip() if match else system_prompt_custom[:100]
         
@@ -354,10 +353,10 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
         if not prompts_visuales:
             prompts_visuales = [f"moody cinematic shot, {oraciones[0] if oraciones else 'dark scene'}"]
             
-        log += f"📋 Se han estructurado {len(prompts_visuales)} escenas de respaldo limpias.\n"
+        log += f"📋 {len(prompts_visuales)} fallback scenes were created cleanly.\n"
         yield log
 
-    log += "🎨 Cargando Stable Diffusion XL en VRAM...\n"
+    log += "🎨 Loading Stable Diffusion XL into VRAM...\n"
     yield log
     
     try:
@@ -369,7 +368,7 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
         
         rutas_imagenes_creadas = []
         for idx, prompt in enumerate(prompts_visuales):
-            log += f"📸 Renderizando Escena {idx+1}/{len(prompts_visuales)}...\n"
+            log += f"📸 Rendering scene {idx+1}/{len(prompts_visuales)}...\n"
             yield log
             
             imagen = pipe_sdxl(
@@ -387,14 +386,14 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
         del pipe_sdxl
         gc.collect()
         torch.cuda.empty_cache()
-        log += "✅ Proceso de imágenes finalizado. VRAM liberada.\n"
+        log += "✅ Image generation complete. VRAM released.\n"
         yield log
     except Exception as e:
-        yield log + f"\n[ERROR EN SDXL]: {e}"
+        yield log + f"\n[SDXL ERROR]: {e}"
         return
 
     if modo_generacion == "Images + AI Video (Cinematic)":
-        log += "🎬 Cargando Stable Video Diffusion (SVD) en VRAM...\n"
+        log += "🎬 Loading Stable Video Diffusion (SVD) into VRAM...\n"
         yield log
         try:
             from diffusers import StableVideoDiffusionPipeline
@@ -405,7 +404,7 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
             pipe_svd.enable_model_cpu_offload()
             
             for idx, ruta_img in enumerate(rutas_imagenes_creadas):
-                log += f"🎥 Animando Clip {idx+1}/{len(rutas_imagenes_creadas)}...\n"
+                log += f"🎥 Animating clip {idx+1}/{len(rutas_imagenes_creadas)}...\n"
                 yield log
                 
                 imagen_base = load_image(ruta_img)
@@ -416,17 +415,17 @@ def ejecutar_pipeline_cinematic(texto_guion, nombre_custom, modo_generacion, can
                 
             del pipe_svd
             torch.cuda.empty_cache()
-            log += "🎉 ¡Producción de clips de video completada con éxito!\n"
+            log += "🎉 Video clips generated successfully!\n"
         except Exception as e:
-            yield log + f"\n[ERROR EN SVD]: {e}"
+            yield log + f"\n[SVD ERROR]: {e}"
             return
 
-    log += f"\n🏆 PROCESO DE CONTENIDO FINALIZADO\n📍 Todo guardado en: {CARPETA_AUDIOS_AI}"
+    log += f"\n🏆 CONTENT PROCESS COMPLETED\n📍 All saved in: {CARPETA_AUDIOS_AI}"
     yield log
 
 def descargar_video_youtube(url, destino_carpeta):
     if not url.strip():
-        return "❌ Error: Por favor introduce un enlace de YouTube válido."
+        return "❌ Error: Please enter a valid YouTube link."
     
     if destino_carpeta == "Cinematic AI Studio":
         carpeta_seleccionada = CARPETA_VIDEOS_AI
@@ -444,52 +443,52 @@ def descargar_video_youtube(url, destino_carpeta):
     }
     if os.path.exists(cookie_path):
         opciones['cookiefile'] = cookie_path
-
+    
     try:
-        print(f"[*] Iniciando descarga web de URL: {url} usando cookies de YouTube si están disponibles...")
+        print(f"[*] Starting download for URL: {url} using cookies if available...")
         with yt_dlp.YoutubeDL(opciones) as ydl:
             ydl.download([url])
-        return f"🎉 ¡Descarga en máxima calidad completada con éxito!\n📍 Guardado en: {carpeta_seleccionada}"
+        return f"🎉 Download completed successfully!\n📍 Saved in: {carpeta_seleccionada}"
     except Exception as e:
-        return f"❌ Ocurrió un error en la descarga: {e}"
+        return f"❌ Download failed: {e}"
 
 with gr.Blocks() as interfaz:
-    gr.Markdown("# ⚡ Suite Multi-Canal de Automatización de Contenido (RTX 3060)")
+    gr.Markdown("# ⚡ Multi-Channel Content Automation Suite (RTX 3060)")
     
     with gr.Tab("🎙️ Reddit Stories Studio"):
         with gr.Row():
             with gr.Column(scale=2):
-                entrada_texto = gr.Textbox(lines=14, placeholder="Pega tu historia de Reddit aquí...", label="Historia Original")
+                entrada_texto = gr.Textbox(lines=14, placeholder="Paste your Reddit story here...", label="Original Story")
                 with gr.Row():
-                    nombre_personalizado = gr.Textbox(placeholder="En blanco para auto-nombrar secuencial (vidX)", label="Nombre de archivo (Opcional)")
-                    btn_generar = gr.Button("🚀 Generar Audio + Subs", variant="primary")
+                    nombre_personalizado = gr.Textbox(placeholder="Leave blank for sequential auto-naming (vidX)", label="File Name (Optional)")
+                    btn_generar = gr.Button("🚀 Generate Audio + Subtitles", variant="primary")
             with gr.Column(scale=1):
-                salida_logs = gr.Textbox(lines=18, label="Registro de Procesos Reddit", interactive=False)
+                salida_logs = gr.Textbox(lines=18, label="Reddit Process Log", interactive=False)
                 
         btn_generar.click(fn=ejecutar_pipeline_reddit, inputs=[entrada_texto, nombre_personalizado], outputs=salida_logs)
 
     with gr.Tab("📥 Background Scraper"):
-        gr.Markdown("### Descarga videos de fondo en máxima calidad de forma manual.")
+        gr.Markdown("### Download background videos in maximum quality manually.")
         with gr.Row():
             with gr.Column(scale=2):
-                entrada_url = gr.Textbox(lines=2, placeholder="Pega el enlace de YouTube aquí...", label="Enlace del Video")
-                destino_carpeta = gr.Radio(["Reddit Stories", "Cinematic AI Studio"], label="¿A qué línea de contenido pertenece este fondo?", value="Reddit Stories")
-                btn_descargar = gr.Button("📥 Iniciar Descarga", variant="primary")
+                entrada_url = gr.Textbox(lines=2, placeholder="Paste the YouTube link here...", label="Video Link")
+                destino_carpeta = gr.Radio(["Reddit Stories", "Cinematic AI Studio"], label="Which content line should this background belong to?", value="Reddit Stories")
+                btn_descargar = gr.Button("📥 Start Download", variant="primary")
             with gr.Column(scale=1):
-                salida_resultado_yt = gr.Textbox(lines=5, label="Estado de la Descarga", interactive=False)
+                salida_resultado_yt = gr.Textbox(lines=5, label="Download Status", interactive=False)
                 
         btn_descargar.click(fn=descargar_video_youtube, inputs=[entrada_url, destino_carpeta], outputs=salida_resultado_yt)
 
     with gr.Tab("🎨 Cinematic AI Studio"):
-        gr.Markdown("### Producción Cinematográfica Exclusiva mediante IA Local")
+        gr.Markdown("### Exclusive Local AI Cinematic Production")
         with gr.Row():
             with gr.Column(scale=2):
-                entrada_guion_ai = gr.Textbox(lines=6, placeholder="Paste your English script here...", label="Guion en Inglés")
+                entrada_guion_ai = gr.Textbox(lines=6, placeholder="Paste your English script here...", label="English Script")
                 
                 selector_estilo = gr.Dropdown(
                     choices=list(PRESETS_ESTILOS.keys()), 
                     value="Dark Psychology & Power", 
-                    label="🧠 Preset Manager (Selecciona tu Identidad Visual)"
+                    label="🧠 Preset Manager (Choose your visual identity)"
                 )
                 
                 with gr.Accordion("⚙️ Advanced Branding & Prompt Configuration", open=False):
@@ -511,10 +510,10 @@ with gr.Blocks() as interfaz:
                 )
                 
                 with gr.Row():
-                    nombre_custom_ai = gr.Textbox(placeholder="En blanco para auto-nombrar (vidX) o pon uno anterior para re-generar", label="Nombre del Proyecto")
-                    modo_salida = gr.Radio(["Images Only (Fast)", "Images + AI Video (Cinematic)"], label="Modo de Producción Visual", value="Images Only (Fast)")
+                    nombre_custom_ai = gr.Textbox(placeholder="Leave blank for auto-naming (vidX) or use an existing one to regenerate", label="Project Name")
+                    modo_salida = gr.Radio(["Images Only (Fast)", "Images + AI Video (Cinematic)"], label="Visual Production Mode", value="Images Only (Fast)")
                 
-                cantidad_escenas = gr.Slider(minimum=3, maximum=15, step=1, value=6, label="Cantidad Total de Escenas a Generar")
+                cantidad_escenas = gr.Slider(minimum=3, maximum=15, step=1, value=6, label="Total Number of Scenes to Generate")
                 btn_ejecutar_ai = gr.Button("🎬 Execute Automated Production", variant="primary")
             
             with gr.Column(scale=1):
