@@ -259,6 +259,36 @@ def build_srt_content(segments):
     return srt_content
 
 
+def transcribe_with_guidance(audio_path, guidance_text, language="en"):
+    """Use the original source text as Whisper context to stabilize subtitle mapping.
+
+    Providing the source text as an initial prompt reduces hallucination and makes transcription more
+    consistent for synthetic voices generated from a known script or story.
+    """
+    cleaned_text = re.sub(r"\s+", " ", guidance_text or "").strip()
+    if len(cleaned_text) > 2000:
+        cleaned_text = cleaned_text[:2000]
+
+    try:
+        return whisper_model.transcribe(
+            audio_path,
+            language=language,
+            word_timestamps=True,
+            initial_prompt=cleaned_text,
+            beam_size=1,
+            best_of=1,
+            condition_on_previous_text=False,
+            vad_filter=True,
+        )
+    except TypeError:
+        return whisper_model.transcribe(
+            audio_path,
+            language=language,
+            word_timestamps=True,
+            initial_prompt=cleaned_text,
+        )
+
+
 def get_next_reddit_name():
     """Find the next sequential file name for Reddit-generated audio files."""
     files = os.listdir(REDDIT_AUDIO_DIR)
@@ -342,7 +372,7 @@ def run_reddit_pipeline(story_text, custom_name):
     log += "[✔] Audio created. Mapping SRT subtitles...\n"
     yield log
     try:
-        segments, _ = whisper_model.transcribe(final_audio_path, language="en", word_timestamps=True)
+        segments, _ = transcribe_with_guidance(final_audio_path, processed_story, language="en")
         srt_content = build_srt_content(segments)
         with open(final_srt_path, "w", encoding="utf-8") as subtitle_file:
             subtitle_file.write(srt_content)
@@ -385,7 +415,7 @@ def run_cinematic_pipeline(script_text, custom_name, generation_mode, scene_coun
             audio_array = generated_audio[0].squeeze()
             torchaudio.save(audio_path, torch.from_numpy(audio_array).unsqueeze(0), 24000)
 
-            segments, _ = whisper_model.transcribe(audio_path, language="en", word_timestamps=True)
+            segments, _ = transcribe_with_guidance(audio_path, script_text, language="en")
             srt_content = build_srt_content(segments)
             with open(subtitle_path, "w", encoding="utf-8") as subtitle_file:
                 subtitle_file.write(srt_content)
