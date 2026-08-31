@@ -223,6 +223,42 @@ def format_time(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
+def build_srt_content(segments):
+    """Convert Whisper segments into SRT text even when word-level metadata is incomplete."""
+    srt_content = ""
+    index = 1
+
+    for segment in segments or []:
+        words = getattr(segment, "words", None) or []
+        start_time = float(getattr(segment, "start", 0.0) or 0.0)
+        end_time = float(getattr(segment, "end", start_time + 1.5) or (start_time + 1.5))
+
+        if words:
+            for word in words:
+                word_text = (getattr(word, "word", "") or "").strip()
+                if not word_text:
+                    continue
+                word_start = float(getattr(word, "start", start_time) or start_time)
+                word_end = float(getattr(word, "end", max(word_start + 1.5, end_time)) or max(word_start + 1.5, end_time))
+                if word_end <= word_start:
+                    word_end = word_start + 1.5
+                srt_content += f"{index}\n{format_time(word_start)} --> {format_time(word_end)}\n{word_text}\n\n"
+                index += 1
+        else:
+            segment_text = (getattr(segment, "text", "") or "").strip()
+            if not segment_text:
+                continue
+            if end_time <= start_time:
+                end_time = start_time + 1.5
+            srt_content += f"{index}\n{format_time(start_time)} --> {format_time(end_time)}\n{segment_text}\n\n"
+            index += 1
+
+    if not srt_content.strip():
+        srt_content = "1\n00:00:00,000 --> 00:00:01,500\nNo speech detected\n\n"
+
+    return srt_content
+
+
 def get_next_reddit_name():
     """Find the next sequential file name for Reddit-generated audio files."""
     files = os.listdir(REDDIT_AUDIO_DIR)
@@ -307,16 +343,7 @@ def run_reddit_pipeline(story_text, custom_name):
     yield log
     try:
         segments, _ = whisper_model.transcribe(final_audio_path, language="en", word_timestamps=True)
-        srt_content = ""
-        index = 1
-        for segment in segments:
-            for word in segment.words:
-                start_time = word.start
-                end_time = word.end
-                if (end_time - start_time) * 1000 > 1500:
-                    end_time = start_time + 1.5
-                srt_content += f"{index}\n{format_time(start_time)} --> {format_time(end_time)}\n{word.word.strip()}\n\n"
-                index += 1
+        srt_content = build_srt_content(segments)
         with open(final_srt_path, "w", encoding="utf-8") as subtitle_file:
             subtitle_file.write(srt_content)
     except Exception as e:
@@ -359,12 +386,7 @@ def run_cinematic_pipeline(script_text, custom_name, generation_mode, scene_coun
             torchaudio.save(audio_path, torch.from_numpy(audio_array).unsqueeze(0), 24000)
 
             segments, _ = whisper_model.transcribe(audio_path, language="en", word_timestamps=True)
-            srt_content = ""
-            index = 1
-            for segment in segments:
-                for word in segment.words:
-                    srt_content += f"{index}\n{format_time(word.start)} --> {format_time(word.end)}\n{word.word.strip()}\n\n"
-                    index += 1
+            srt_content = build_srt_content(segments)
             with open(subtitle_path, "w", encoding="utf-8") as subtitle_file:
                 subtitle_file.write(srt_content)
             log += "✅ Audio and subtitles generated successfully.\n"
